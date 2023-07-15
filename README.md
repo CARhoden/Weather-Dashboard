@@ -1,6 +1,6 @@
 # Weather-Dashboard
 
-This is a work day scheduler that will save the users input into local storage and retrieve it later. It also uses the weather api to get day and time and color code the scheduler depending on the time.
+This is a website that uses the weather api so that you can look up the current weather in any city.
 
 ### Getting Started 
 
