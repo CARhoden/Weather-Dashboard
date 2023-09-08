@@ -1,97 +1,99 @@
-var inputCity = '';
-var currentDate = dayjs().format("(MM/DD/YYYY)");
-$('#todaysDate').text(currentDate)
-var previousCity = []
+let inputCity = '';
+const currentDate = dayjs().format("(MM/DD/YYYY)");
+const $todaysDate = $('#todaysDate');
+const $history = $('#history');
+const previousCity = JSON.parse(localStorage.getItem("History")) || [];
 
-function getCords(url) {
-    fetch(url)
-        .then(function (response) {
-            return response.json();
-        })
-        .then(function (data) {
-            var lon = data[0].lon;
-            var lat = data[0].lat;
-            var cords = [lat, lon]
-            return cords
-        })
-        .then(function (data) {
-            var weatherUrl = 'https://api.openweathermap.org/data/3.0/onecall?lat=' + data[0] + '&lon=' + data[1] + '&exclude=minutely,hourly&units=imperial&appid=fbbc0ff2ad4eb4bfe4580caab86f90b3'
-            console.log(weatherUrl)
-            fetch(weatherUrl)
-                .then(function (response) {
-                    return response.json()
-                })
-                .then(function (data) {
-                    var weatherIcon = data.current.weather[0].icon;
-                    var iconUrl = "http://openweathermap.org/img/w/" + weatherIcon + ".png";
-                    $('#currentIcon').attr('src', iconUrl)
-                    $('#cityName').text(inputCity + ' ' + currentDate)
-                    $('#cityTemp').text('Temperature: ' + data.current.temp + '℉')
-                    $('#cityWind').text('Wind: ' + data.current.wind_speed + 'MPH')
-                    $('#cityHumidity').text('Humidity: ' + data.current.humidity + '%')
-                    var forecastCards = $('.text-dark').length + 1
-                    for (i = 1; i < forecastCards; i++) {
-                        $('#day' + [i] + 'Date').text(dayjs.unix(data.daily[i].dt).format('MM/DD/YYYY'))
-                        $('#day' + [i] + 'Temp').text('Temperature: ' + data.daily[i].temp.day + '℉')
-                        $('#day' + [i] + 'Wind').text('Wind: ' + data.daily[i].wind_speed + 'MPH')
-                        $('#day' + [i] + 'Humid').text('Humidity: ' + data.daily[i].humidity + '%')
-                        var weatherIcon = data.daily[i].weather[0].icon;
-                        var iconUrl = "http://openweathermap.org/img/w/" + weatherIcon + ".png";
-                        $('#day' + [i] + 'icon').attr('src', iconUrl)
-                    }
-                })
-        })
+async function getLocationCoordinates(city) {
+    try {
+        const geoUrl = `https://api.openweathermap.org/geo/1.0/direct?q=${city}&limit=1&appid=33419229afcf48474dbe9c7c3a1094ed`;
+        const response = await fetch(geoUrl);
+        const data = await response.json();
+        if (data.length > 0) {
+            const { lat, lon } = data[0];
+            return [lat, lon];
+        }
+    } catch (error) {
+        console.error('Error fetching location coordinates:', error);
+    }
+    return null;
 }
 
-$('#searchBtn').on('click', function () {
-    inputCity = $('#cityInput').val()
-    var geoUrl = 'https://api.openweathermap.org/geo/1.0/direct?q=' + inputCity + '&limit=1&appid=fbbc0ff2ad4eb4bfe4580caab86f90b3'
-    getCords(geoUrl)
-    if (previousCity.includes(inputCity)) {
-        return
-    } else {
-        previousCity.push(inputCity)
-        var number = previousCity.length - 1
-        var btn = $('<button>', { class: 'history' + number + ' btn btn-secondary my-2 w-100', id: inputCity })
-        btn.text(inputCity)
-        $('#history').append(btn)
-        localStorage.setItem("History", JSON.stringify(previousCity))
-        $('#cityInput').val("")
-        btn.on('click', function () {
-            inputCity = $(this).attr('id')
-            var geoUrl = 'https://api.openweathermap.org/geo/1.0/direct?q=' + inputCity + '&limit=1&appid=fbbc0ff2ad4eb4bfe4580caab86f90b3'
-            getCords(geoUrl)
-        })
-    }
+function updateForecastCard(day, data) {
+    $(`#d${day}Date`).text(dayjs.unix(data.daily[day - 1].dt).format('MM/DD/YYYY'));
+    $(`#d${day}Temp`).text(`Temperature: ${data.daily[day - 1].temp.day}℉`);
+    $(`#d${day}Wind`).text(`Wind: ${data.daily[day - 1].wind_speed}MPH`);
+    $(`#d${day}Humid`).text(`Humidity: ${data.daily[day - 1].humidity}%`);
+}
 
-})
+async function fetchWeatherAndRender(city) {
+    try {
+        const [lat, lon] = await getLocationCoordinates(city);
+        if (lat && lon) {
+            const weatherUrl = `https://api.openweathermap.org/data/3.0/onecall?lat=${lat}&lon=${lon}&exclude=minutely,hourly&units=imperial&appid=33419229afcf48474dbe9c7c3a1094ed`;
+            console.log("Weather URL:", weatherUrl);
+            const response = await fetch(weatherUrl);
+            const data = await response.json();
+            console.log("Weather Data:", data);
 
-function init() {
-    var storedCities = JSON.parse(localStorage.getItem("History"));
+            $('#cityName').text(city + ' ' + currentDate);
+            $('#cityTemp').text(`Temperature: ${data.current.temp}℉`);
+            $('#cityWind').text(`Wind: ${data.current.wind_speed}MPH`);
+            $('#cityHumidity').text(`Humidity: ${data.current.humidity}%`);
+            const weatherIcon = data.current.weather[0].icon;
+            const iconUrl = "http://openweathermap.org/img/w/" + weatherIcon + ".png";
+            $('#currentIcon').attr('src', iconUrl);
 
-    if (storedCities != null) {
-        previousCity = storedCities;
-    }
-
-    for (i = 0; i < previousCity.length; i++) {
-        var city = previousCity[i];
-
-        var btn = $('<button>', { class: 'history' + [i] + ' btn btn-secondary my-2 w-100', id: city })
-        btn.text(city)
-        $('#history').append(btn)
+            for (let day = 1; day <= 5; day++) {
+                updateForecastCard(day, data);
+            }
+        }
+    } catch (error) {
+        console.error('Error fetching weather data:', error);
     }
 }
 
-function watchHistory() {
-    for (i = 0; i < previousCity.length; i++) {
-        $('.history' + [i]).on('click', function () {
-            inputCity = $(this).attr('id')
-            var geoUrl = 'https://api.openweathermap.org/geo/1.0/direct?q=' + inputCity + '&limit=1&appid=fbbc0ff2ad4eb4bfe4580caab86f90b3'
-            getCords(geoUrl)
-        })
-    }
-    return
+function initSearchHistory() {
+    previousCity.forEach((city, index) => {
+        const $btn = $('<button>', {
+            class: 'history btn btn-secondary my-2 w-100',
+            id: city
+        }).text(city);
+
+        $btn.on('click', () => {
+            inputCity = city;
+            fetchWeatherAndRender(inputCity);
+        });
+
+        $history.append($btn);
+    });
 }
 
-init()
-watchHistory() 
+function updateSearchHistory(city) {
+    if (!previousCity.includes(city)) {
+        previousCity.push(city);
+
+        const $btn = $('<button>', {
+            class: 'history btn btn-secondary my-2 w-100',
+            id: city
+        }).text(city);
+
+        $btn.on('click', () => {
+            inputCity = city;
+            fetchWeatherAndRender(inputCity);
+        });
+
+        $history.append($btn);
+
+        localStorage.setItem("History", JSON.stringify(previousCity));
+    }
+}
+
+$('#searchBtn').on('click', () => {
+    inputCity = $('#cityInput').val();
+    fetchWeatherAndRender(inputCity);
+    updateSearchHistory(inputCity);
+    $('#cityInput').val('');
+});
+
+initSearchHistory();
